@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Governance Index Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#1c2333;--mut:#64708a;--pri:#2563eb;--bd:#dde3ef;--ok:#dcfce7;--acc:#1e3a8a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Sarabun,'Noto Sans Thai',system-ui,sans-serif;line-height:1.5}
+header{background:linear-gradient(120deg,#0f172a,#1e3a8a 55%,#0d9488);color:#fff;padding:22px 16px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 14px}
+header .wrap{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+h1{margin:0;font-size:1.6rem}header p{margin:2px 0 0;opacity:.9}
+main{padding:18px 0 50px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px #0001}
+button,select,input{font:inherit}
+.btn{border:0;border-radius:9px;padding:8px 14px;cursor:pointer;background:var(--pri);color:#fff;font-weight:600}
+.btn.sec{background:#e8edf7;color:var(--ink)}.btn.warn{background:#ef4444}.btn.ok{background:#16a34a}
+.btn:hover{filter:brightness(1.08)}.btn:disabled{opacity:.55;cursor:default}
+.lang{display:flex;border-radius:9px;overflow:hidden;border:1px solid #fff8}
+.lang button{background:transparent;color:#fff;border:0;padding:6px 14px;cursor:pointer}
+.lang button.on{background:#fff;color:#1e3a8a;font-weight:700}
+/* index picker */
+.picker{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+@media(max-width:900px){.picker{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:420px){.picker{grid-template-columns:1fr}}
+.ix{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:2px solid var(--bd);background:#fff;border-radius:12px;padding:12px;cursor:pointer;color:var(--ink);transition:.15s}
+.ix:hover{border-color:#93b4f5;transform:translateY(-1px)}
+.ix .ic{font-size:1.5rem;line-height:1}.ix b{font-size:1rem}.ix small{color:var(--mut);font-size:.8rem}
+.ix.on{border-color:var(--c,#2563eb);background:color-mix(in srgb,var(--c,#2563eb) 9%,#fff);box-shadow:0 0 0 3px color-mix(in srgb,var(--c,#2563eb) 18%,transparent)}
+.about{margin-top:14px;padding:12px 14px;border-radius:10px;background:#f6f8fd;border-left:5px solid var(--c,#2563eb)}
+.about h2{margin:0 0 4px;font-size:1.1rem}.about p{margin:2px 0;color:#334155;font-size:.93rem}.about a{color:var(--pri)}
+.dir{display:inline-block;padding:1px 9px;border-radius:99px;font-size:.8rem;font-weight:700;margin-left:6px;vertical-align:middle}
+.dir.up{background:#dcfce7;color:#166534}.dir.down{background:#fee2e2;color:#991b1b}
+/* data panel */
+.dpanel{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.dpanel select{padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:#fff}
+.dpanel label,.cyl{display:flex;gap:6px;align-items:center;font-size:.92rem;color:var(--mut)}
+.dpanel a{color:var(--pri);font-size:.9rem}
+.dstat{margin-top:10px;padding:9px 12px;border-radius:9px;background:#eef2fa;font-size:.93rem}
+.dstat.good{background:#ecfdf3;color:#14532d}.dstat.warn{background:#fff7e6;color:#7c4a03}
+.dstat small{display:block;opacity:.85;word-break:break-word}.dstat .new{font-weight:700;margin-top:4px}
+/* search */
+.sbox{position:relative}
+#q{width:100%;padding:12px 14px;border:2px solid var(--bd);border-radius:10px;font-size:1.05rem}
+#q:focus{outline:0;border-color:var(--pri)}#q:disabled{background:#f1f3f8}
+#dd{position:absolute;z-index:20;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--bd);border-radius:10px;max-height:320px;overflow:auto;box-shadow:0 8px 24px #0002;display:none}
+#dd div{padding:8px 14px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+#dd div:hover,#dd div.hl{background:#eaf1ff}#dd small{color:var(--mut)}#dd .on{font-weight:700;color:var(--pri)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{background:#eaf1ff;border:1px solid #bcd0fb;border-radius:99px;padding:3px 6px 3px 12px;display:flex;gap:6px;align-items:center}
+.chip b{cursor:pointer;background:#c9d9fb;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:.8rem}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px}
+.bar .g{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+/* table */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:420px}
+th,td{border:1px solid var(--bd);padding:7px 12px;text-align:right;white-space:nowrap}
+th{background:#1e3a8a;color:#fff}td:first-child,th:first-child{text-align:left;position:sticky;left:0;background:#f1f5fd;color:var(--ink);font-weight:600}
+th:first-child{background:#1e3a8a;color:#fff}
+td.best{background:var(--ok);font-weight:700}
+tr.sec td{background:#1e3a8a14!important;color:#1e3a8a;font-weight:700;text-align:left;position:static}
+.cyl select,.ctl .xs{padding:5px 8px;border:1px solid var(--bd);border-radius:8px;background:#fff;font-weight:600}
+.cap{color:var(--mut);font-size:.93rem;margin:10px 0 0}
+.empty{text-align:center;color:var(--mut);padding:30px}
+/* charts */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:16px}
+@media(max-width:560px){.grid{grid-template-columns:1fr}}
+.ch h3{margin:0 0 2px;font-size:1.05rem}.ch p{margin:0 0 8px;color:var(--mut);font-size:.88rem}
+.ctl{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;font-size:.9rem}
+.ctl select,.ctl input{padding:4px 6px;border:1px solid var(--bd);border-radius:7px}.ctl input{width:56px}
+.cv{position:relative;height:380px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<div><h1 data-i="title"></h1><p data-i="sub"></p></div>
+<div class="lang"><button id="bth">ไทย</button><button id="ben">English</button></div>
+</div></header>
+<main class="wrap">
+<section class="card">
+<div class="picker" id="picker"></div>
+<div class="about" id="about"></div>
+</section>
+<section class="card">
+<div class="dpanel">
+<button class="btn" id="bup" data-i="upd"></button>
+<button class="btn sec" id="bimp" data-i="imp"></button><input type="file" id="dfile" accept=".csv,.json,.xlsx,.xls" hidden>
+<a id="dl" target="_blank" rel="noopener"></a>
+<label><span data-i="yv"></span><select id="dym"></select></label>
+</div>
+<div class="dstat" id="dstat"></div>
+</section>
+<section class="card">
+<div class="sbox"><input id="q" autocomplete="off"><div id="dd"></div></div>
+<div class="chips" id="chips"></div>
+<div class="bar" style="margin:14px 0 0">
+<div class="g"><button class="btn" id="bch" data-i="showCh"></button></div>
+<button class="btn warn" id="brs" data-i="reset"></button>
+</div>
+</section>
+<section class="card" id="tcard">
+<div class="bar"><h2 style="margin:0;font-size:1.2rem" id="tTitle"></h2>
+<div class="g"><label class="cyl" id="cyl"><span data-i="cyL"></span><select id="cyr"></select></label><button class="btn ok" id="bxl" data-i="xl"></button></div></div>
+<div class="tw" id="tbl"></div>
+<p class="cap" id="cap"></p>
+</section>
+<section id="charts" style="display:none"><div class="grid" id="grid"></div></section>
+<p class="cap" id="srcnote"></p>
+</main>
+<script>
+/* =====================================================================
+   GOVERNANCE INDEX EXPLORER — ดึงข้อมูลจริงจากฐานข้อมูลออนไลน์และอัปเดตอัตโนมัติ
+   แต่ละดัชนีกำหนดไว้ใน IDX ด้านล่าง: แหล่งข้อมูลหลัก (main) + ตัวชี้วัดองค์ประกอบ/ตัวชี้วัดเสริม (comps)
+     t:'owid' = CSV จาก Our World in Data grapher (เปิด CORS)
+     t:'wb'   = World Bank API (JSON)
+     t:'file' = ต้องนำเข้าไฟล์เอง (KOF ไม่มี API สาธารณะ)
+   แคชในเบราว์เซอร์ 24 ชม. และตรวจสอบข้อมูลใหม่ทุก 6 ชม. ขณะเปิดหน้า
+   ===================================================================== */
+const NOW=new Date().getFullYear();
+const OW=s=>`https://ourworldindata.org/grapher/${s}.csv?v=1&csvType=full&useColumnShortNames=false`;
+const WB=c=>`https://api.worldbank.org/v2/country/all/indicator/${c}?format=json&per_page=20000&date=1996:${NOW}`;
+const IDX={
+ transparency:{ic:'🔍',col:'#0891b2',min:0,max:100,dec:0,hb:true,y0:2012,
+  th:'ดัชนีความโปร่งใส',en:'Transparency Index',
+  full:{th:'ดัชนีการรับรู้การทุจริต (Corruption Perceptions Index, CPI) — Transparency International',en:'Corruption Perceptions Index (CPI) — Transparency International'},
+  desc:{th:'วัดระดับความโปร่งใสและความสะอาดของภาครัฐตามการรับรู้ของผู้เชี่ยวชาญและภาคธุรกิจ คะแนน 0–100: 100 = โปร่งใส/สะอาดมาก, 0 = ทุจริตสูงมาก',en:'Perceived transparency and cleanliness of the public sector according to experts and business people. Score 0–100: 100 = very clean, 0 = highly corrupt.'},
+  src:{n:'Transparency International (ผ่าน Our World in Data)',ne:'Transparency International (via Our World in Data)',url:'https://www.transparency.org/en/cpi'},
+  main:{t:'owid',u:OW('ti-corruption-perception-index')},
+  comps:[
+   {k:'va',th:'เสียงของประชาชนและความรับผิดชอบ (WGI, 0–100)',en:'Voice & Accountability (WGI score, 0–100)',t:'wb',u:WB('GOV_WGI_VA_SC'),dec:1,hb:true,min:0,max:100},
+   {k:'cc',th:'การควบคุมการทุจริต (WGI, 0–100)',en:'Control of Corruption (WGI score, 0–100)',t:'wb',u:WB('GOV_WGI_CC_SC'),dec:1,hb:true,min:0,max:100},
+   {k:'rq',th:'คุณภาพของกฎระเบียบ (WGI, 0–100)',en:'Regulatory Quality (WGI score, 0–100)',t:'wb',u:WB('GOV_WGI_RQ_SC'),dec:1,hb:true,min:0,max:100}]},
+ corruption:{ic:'⚖️',col:'#dc2626',min:0,max:1,dec:3,hb:false,y0:1990,
+  th:'ดัชนีการคอร์รัปชัน',en:'Corruption Index',
+  full:{th:'ดัชนีคอร์รัปชันทางการเมือง (Political Corruption Index) — V-Dem',en:'Political Corruption Index — V-Dem'},
+  desc:{th:'วัดระดับคอร์รัปชันในฝ่ายบริหาร ฝ่ายนิติบัญญัติ ฝ่ายตุลาการ และภาครัฐ ค่า 0–1: ยิ่งสูงยิ่งคอร์รัปชันมาก (ค่าต่ำ = ดี)',en:'Corruption across the executive, legislature, judiciary and public sector. Scale 0–1: higher = more corrupt (lower is better).'},
+  src:{n:'V-Dem (ผ่าน Our World in Data)',ne:'V-Dem (via Our World in Data)',url:'https://v-dem.net/data/the-v-dem-dataset/'},
+  main:{t:'owid',u:OW('political-corruption-index')},
+  comps:[
+   {k:'ex',th:'ดัชนีคอร์รัปชันฝ่ายบริหาร (V-Dem, 0–1)',en:'Executive corruption index (V-Dem, 0–1)',t:'owid',u:OW('executive-corruption-index'),dec:3,hb:false,min:0,max:1},
+   {k:'ps',th:'ดัชนีคอร์รัปชันภาครัฐ (V-Dem, 0–1)',en:'Public sector corruption index (V-Dem, 0–1)',t:'owid',u:OW('public-sector-corruption-index'),dec:3,hb:false,min:0,max:1},
+   {k:'cc',th:'การควบคุมการทุจริต (WGI, 0–100)',en:'Control of Corruption (WGI score, 0–100)',t:'wb',u:WB('GOV_WGI_CC_SC'),dec:1,hb:true,min:0,max:100}]},
+ stability:{ic:'🏛️',col:'#7c3aed',min:0,max:100,dec:1,hb:true,y0:1996,
+  th:'ความมั่นคงของรัฐบาล',en:'Government Stability',
+  full:{th:'เสถียรภาพทางการเมืองและการไม่มีความรุนแรง/การก่อการร้าย — Worldwide Governance Indicators (ธนาคารโลก)',en:'Political Stability and Absence of Violence/Terrorism — Worldwide Governance Indicators (World Bank)'},
+  desc:{th:'วัดความเป็นไปได้ที่รัฐบาลจะถูกบั่นทอนหรือโค่นล้มด้วยวิธีที่ไม่ชอบด้วยกฎหมายหรือความรุนแรง คะแนน 0–100: ยิ่งสูงยิ่งมั่นคง',en:'Likelihood that the government will be destabilised or overthrown by unconstitutional or violent means. Score 0–100: higher = more stable.'},
+  src:{n:'World Bank Worldwide Governance Indicators',ne:'World Bank Worldwide Governance Indicators',url:'https://www.worldbank.org/en/publication/worldwide-governance-indicators'},
+  main:{t:'wb',u:WB('GOV_WGI_PV_SC')},
+  comps:[
+   {k:'pve',th:'ค่าประมาณเสถียรภาพทางการเมือง (−2.5 ถึง +2.5)',en:'Political stability estimate (−2.5 to +2.5)',t:'wb',u:WB('GOV_WGI_PV_EST'),dec:2,hb:true,min:-2.5,max:2.5},
+   {k:'ge',th:'ประสิทธิผลของรัฐบาล (WGI, 0–100)',en:'Government Effectiveness (WGI score, 0–100)',t:'wb',u:WB('GOV_WGI_GE_SC'),dec:1,hb:true,min:0,max:100},
+   {k:'rl',th:'หลักนิติธรรม (WGI, 0–100)',en:'Rule of Law (WGI score, 0–100)',t:'wb',u:WB('GOV_WGI_RL_SC'),dec:1,hb:true,min:0,max:100}]},
+ globalization:{ic:'🌐',col:'#059669',min:0,max:100,dec:1,hb:true,y0:1970,
+  th:'ดัชนีโลกาภิวัตน์',en:'Globalization Index',
+  full:{th:'KOF Globalisation Index — KOF Swiss Economic Institute, ETH Zurich',en:'KOF Globalisation Index — KOF Swiss Economic Institute, ETH Zurich'},
+  desc:{th:'วัดระดับการเชื่อมโยงกับโลกใน 3 มิติ: เศรษฐกิจ สังคม และการเมือง คะแนน 0–100: ยิ่งสูงยิ่งเป็นโลกาภิวัตน์มาก — KOF ไม่มี API สาธารณะ จึงต้องดาวน์โหลดไฟล์ข้อมูล (.xlsx) จากเว็บ KOF แล้วกด "นำเข้าไฟล์" (ทำครั้งเดียว ระบบจะจำไว้)',en:'Degree of global integration across economic, social and political dimensions. Score 0–100: higher = more globalised — KOF has no public API, so download the data file (.xlsx) from KOF and press "Import file" (once; it is remembered).'},
+  src:{n:'KOF Swiss Economic Institute',ne:'KOF Swiss Economic Institute',url:'https://www.kof.ethz.ch/en/forecasts-and-indicators/indicators/kof-globalisation-index.html'},
+  main:{t:'file',col:'KOFGI'},
+  comps:[
+   {k:'KOFEcGI',th:'โลกาภิวัตน์ด้านเศรษฐกิจ (0–100)',en:'Economic globalisation (0–100)',t:'file',dec:1,hb:true,min:0,max:100},
+   {k:'KOFSoGI',th:'โลกาภิวัตน์ด้านสังคม (0–100)',en:'Social globalisation (0–100)',t:'file',dec:1,hb:true,min:0,max:100},
+   {k:'KOFPoGI',th:'โลกาภิวัตน์ด้านการเมือง (0–100)',en:'Political globalisation (0–100)',t:'file',dec:1,hb:true,min:0,max:100},
+   {k:'KOFGIdf',th:'โลกาภิวัตน์โดยพฤตินัย (de facto)',en:'De facto globalisation',t:'file',dec:1,hb:true,min:0,max:100},
+   {k:'KOFGIdj',th:'โลกาภิวัตน์โดยนิตินัย (de jure)',en:'De jure globalisation',t:'file',dec:1,hb:true,min:0,max:100}]},
+ cso:{ic:'🤝',col:'#d97706',min:0,max:1,dec:3,hb:true,y0:1990,
+  th:'ดัชนีองค์กรประชาสังคม',en:'Civil Society Organization Index',
+  full:{th:'ดัชนีประชาสังคมหลัก (Core Civil Society Index, CCSI) — V-Dem',en:'Core Civil Society Index (CCSI) — V-Dem'},
+  desc:{th:'วัดว่าองค์กรภาคประชาสังคม (CSO) ดำเนินงานได้อย่างอิสระจากรัฐเพียงใด ทั้งการจัดตั้ง/ยุบเลิก การถูกกดขี่ และการมีส่วนร่วม ค่า 0–1: ยิ่งสูงยิ่งเข้มแข็งและเป็นอิสระ',en:'How autonomous civil society organisations are from the state: entry/exit, repression and participation. Scale 0–1: higher = stronger and more autonomous.'},
+  src:{n:'V-Dem (ผ่าน Our World in Data)',ne:'V-Dem (via Our World in Data)',url:'https://v-dem.net/data/the-v-dem-dataset/'},
+  main:{t:'owid',u:OW('strong-civil-society-index')},
+  comps:[
+   {k:'part',th:'ดัชนีการมีส่วนร่วมของภาคประชาสังคม (V-Dem, 0–1)',en:'Civil society participation index (V-Dem, 0–1)',t:'owid',u:OW('civil-society-participation-index'),dec:3,hb:true,min:0,max:1},
+   {k:'fa',th:'ดัชนีเสรีภาพในการรวมกลุ่ม (V-Dem, 0–1)',en:'Freedom of association index (V-Dem, 0–1)',t:'owid',u:OW('freedom-of-association-index'),dec:3,hb:true,min:0,max:1}]}
+};
+const ORDER=['transparency','corruption','stability','globalization','cso'];
+
+const ISO3='ABWAW,AFGAF,AGOAO,AIAAI,ALAAX,ALBAL,ANDAD,AREAE,ARGAR,ARMAM,ASMAS,ATAAQ,ATFTF,ATGAG,AUSAU,AUTAT,AZEAZ,BDIBI,BELBE,BENBJ,BESBQ,BFABF,BGDBD,BGRBG,BHRBH,BHSBS,BIHBA,BLMBL,BLRBY,BLZBZ,BMUBM,BOLBO,BRABR,BRBBB,BRNBN,BTNBT,BVTBV,BWABW,CAFCF,CANCA,CCKCC,CHECH,CHLCL,CHNCN,CIVCI,CMRCM,CODCD,COGCG,COKCK,COLCO,COMKM,CPVCV,CRICR,CUBCU,CUWCW,CXRCX,CYMKY,CYPCY,CZECZ,DEUDE,DJIDJ,DMADM,DNKDK,DOMDO,DZADZ,ECUEC,EGYEG,ERIER,ESHEH,ESPES,ESTEE,ETHET,FINFI,FJIFJ,FLKFK,FRAFR,FROFO,FSMFM,GABGA,GBRGB,GEOGE,GGYGG,GHAGH,GIBGI,GINGN,GLPGP,GMBGM,GNBGW,GNQGQ,GRCGR,GRDGD,GRLGL,GTMGT,GUFGF,GUMGU,GUYGY,HKGHK,HMDHM,HNDHN,HRVHR,HTIHT,HUNHU,IDNID,IMNIM,INDIN,IOTIO,IRLIE,IRNIR,IRQIQ,ISLIS,ISRIL,ITAIT,JAMJM,JEYJE,JORJO,JPNJP,KAZKZ,KENKE,KGZKG,KHMKH,KIRKI,KNAKN,KORKR,KWTKW,LAOLA,LBNLB,LBRLR,LBYLY,LCALC,LIELI,LKALK,LSOLS,LTULT,LUXLU,LVALV,MACMO,MAFMF,MARMA,MCOMC,MDAMD,MDGMG,MDVMV,MEXMX,MHLMH,MKDMK,MLIML,MLTMT,MMRMM,MNEME,MNGMN,MNPMP,MOZMZ,MRTMR,MSRMS,MTQMQ,MUSMU,MWIMW,MYSMY,MYTYT,NAMNA,NCLNC,NERNE,NFKNF,NGANG,NICNI,NIUNU,NLDNL,NORNO,NPLNP,NRUNR,NZLNZ,OMNOM,PAKPK,PANPA,PCNPN,PERPE,PHLPH,PLWPW,PNGPG,POLPL,PRIPR,PRKKP,PRTPT,PRYPY,PSEPS,PYFPF,QATQA,REURE,ROURO,RUSRU,RWARW,SAUSA,SDNSD,SENSN,SGPSG,SGSGS,SHNSH,SJMSJ,SLBSB,SLESL,SLVSV,SMRSM,SOMSO,SPMPM,SRBRS,SSDSS,STPST,SURSR,SVKSK,SVNSI,SWESE,SWZSZ,SXMSX,SYCSC,SYRSY,TCATC,TCDTD,TGOTG,THATH,TJKTJ,TKLTK,TKMTM,TLSTL,TONTO,TTOTT,TUNTN,TURTR,TUVTV,TWNTW,TZATZ,UGAUG,UKRUA,UMIUM,URYUY,USAUS,UZBUZ,VATVA,VCTVC,VENVE,VGBVG,VIRVI,VNMVN,VUTVU,WLFWF,WSMWS,YEMYE,ZAFZA,ZMBZM,ZWEZW';
+const I32={};ISO3.split(',').forEach(s=>I32[s.slice(0,3)]=s.slice(3));
+Object.assign(I32,{XKX:'XK',KSV:'XK',OWID_KOS:'XK'});
+const TH_G={'World':'ทั่วโลก','Africa':'แอฟริกา','Asia':'เอเชีย','Europe':'ยุโรป','North America':'อเมริกาเหนือ','South America':'อเมริกาใต้','Oceania':'โอเชียเนีย','__AVG':'ค่าเฉลี่ยทุกประเทศ (คำนวณ)'};
+const CK=id=>'govIdx.cache.v1.'+id,PK='govIdx.prefs.v1',MAX_AGE=24*3600e3,POLL=6*3600e3;
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
+
+/* ---------- parsing ---------- */
+function parseCSV(txt){
+  txt=txt.replace(/^﻿/,'');const out=[];let row=[],f='',q=false;
+  for(let i=0;i<txt.length;i++){const ch=txt[i];
+    if(q){if(ch==='"'){if(txt[i+1]==='"'){f+='"';i++}else q=false}else f+=ch}
+    else if(ch==='"')q=true;else if(ch===','){row.push(f);f=''}
+    else if(ch==='\n'){row.push(f);out.push(row);row=[];f=''}else if(ch!=='\r')f+=ch}
+  if(f||row.length){row.push(f);out.push(row)}
+  return out.filter(r=>r.length>1||r[0]);
+}
+const num=s=>{if(s==null||s==='')return null;const v=+s;return isFinite(v)?v:null};
+/* entity: {n, iso3, c(ISO2|''), ct(country?), s:{slot:{year:value}}} */
+function put(M,name,code,ct,year,val,slot){
+  code=(code||'').trim();name=String(name||code).trim();
+  if(code==='OWID_WRL'){code='';ct=false;name='World'}
+  const c=I32[code]||'';
+  if(!ct)name=name.replace(/\s*\([^)]*\)\s*$/,'').trim();
+  const k=ct?(code||name):'G:'+name;
+  const e=M.get(k)||{n:name,iso3:code,c,ct,s:{}};
+  if(year!=null&&val!=null&&isFinite(year))(e.s[slot]||(e.s[slot]={}))[year]=val;
+  M.set(k,e);
+}
+function fromOWID(R,M,slot){
+  const h=R[0].map(s=>s.toLowerCase().trim());
+  const iE=h.indexOf('entity'),iC=h.indexOf('code'),iY=h.indexOf('year');
+  const iV=h.findIndex((s,i)=>i!==iE&&i!==iC&&i!==iY&&!/annotation|region|owid_region/.test(s));
+  if(iE<0||iY<0||iV<0)throw new Error('OWID CSV format');
+  R.slice(1).forEach(r=>{const code=r[iC]||'';put(M,r[iE],code,!!code&&code!=='OWID_WRL',+r[iY],num(r[iV]),slot)});
+}
+function fromWB(J,M,slot){
+  if(!Array.isArray(J)||!Array.isArray(J[1])){const msg=J&&J[0]&&J[0].message;throw new Error('World Bank API: '+(msg?JSON.stringify(msg):'no data'))}
+  J[1].forEach(o=>{const iso=o.countryiso3code||'';put(M,o.country&&o.country.value,iso,!!I32[iso],+o.date,num(o.value),slot)});
+}
+/* KOF / generic wide-or-long table (array of arrays) */
+function fromTable(R,M,def){
+  let hi=R.findIndex(r=>r.some(x=>/^year$/i.test(String(x).trim())));if(hi<0)throw new Error(T[lang].badFile);
+  const h=R[hi].map(x=>String(x).trim());const lh=h.map(x=>x.toLowerCase());
+  const iY=lh.indexOf('year'),iC=lh.findIndex(x=>['code','iso3','iso','countrycode','country code','iso3c'].includes(x)),iN=lh.findIndex(x=>['country','entity','country name','countryname'].includes(x));
+  if(iC<0&&iN<0)throw new Error(T[lang].badFile);
+  const cols=[];
+  if(def.main.col&&h.includes(def.main.col)){cols.push(['main',h.indexOf(def.main.col)]);def.comps.forEach(c=>{if(h.includes(c.k))cols.push([c.k,h.indexOf(c.k)])})}
+  else{const iV=lh.findIndex((x,i)=>i!==iY&&i!==iC&&i!==iN&&R.slice(hi+1,hi+30).some(r=>num(r[i])!=null));if(iV<0)throw new Error(T[lang].badFile);cols.push(['main',iV])}
+  R.slice(hi+1).forEach(r=>{const code=iC>=0?String(r[iC]||'').trim().toUpperCase():'';const name=iN>=0?r[iN]:code;
+    const ct=!!I32[code];cols.forEach(([slot,i])=>put(M,name,code,ct||(!!code&&code.length===3&&!/^(WLD|WORLD)$/.test(code)),+r[iY],num(r[i]),slot))});
+}
+function toModel(M,def,src){
+  const ents=[...M.values()];
+  const cnt={};ents.forEach(e=>{if(e.ct&&e.s.main)Object.keys(e.s.main).forEach(y=>cnt[y]=(cnt[y]||0)+1)});
+  const years=Object.keys(cnt).map(Number).filter(y=>cnt[y]>=30&&y>=def.y0&&y<=NOW).sort((a,b)=>a-b);
+  if(years.length<1)throw new Error(T[lang].noMain);
+  const slots=['main',...def.comps.map(c=>c.k)];
+  const rows=ents.filter(e=>e.s.main&&years.some(y=>e.s.main[y]!=null)).map(e=>{
+    const v={};slots.forEach(s=>{const a=years.map(y=>e.s[s]?e.s[s][y]??null:null);if(a.some(x=>x!=null))v[s]=a});
+    return {n:e.n,iso3:e.iso3,c:e.c,ct:e.ct,v}});
+  /* computed average of all countries */
+  const C=rows.filter(r=>r.ct),avg={};
+  slots.forEach(s=>{const a=years.map((y,i)=>{const xs=C.map(r=>r.v[s]&&r.v[s][i]).filter(x=>x!=null);return xs.length>=10?+(xs.reduce((p,q)=>p+q,0)/xs.length).toFixed(4):null});if(a.some(x=>x!=null))avg[s]=a});
+  rows.push({n:'__AVG',iso3:'',c:'',ct:false,v:avg,avg:true});
+  return {id:def.id,years,rows,src:Object.assign({ts:Date.now(),latest:years.at(-1)},src)};
+}
+async function fetchText(url,ms=40000){
+  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),ms);
+  try{const r=await fetch(url,{signal:ac.signal,cache:'no-cache'});if(!r.ok)throw new Error('HTTP '+r.status);return await r.text()}
+  catch(e){throw new Error(e.name==='AbortError'?'timeout':e.message)}
+  finally{clearTimeout(tm)}
+}
+async function loadSlot(spec,M,slot){
+  const txt=await fetchText(spec.u);
+  if(spec.t==='owid')fromOWID(parseCSV(txt),M,slot);else fromWB(JSON.parse(txt),M,slot);
+}
+async function fetchIndex(id){
+  const def=IDX[id];if(def.main.t==='file')throw new Error(T[lang].needFile);
+  const M=new Map();
+  try{await loadSlot(def.main,M,'main')}catch(e){throw new Error(srcHost(def.main.u)+': '+e.message)}
+  const res=await Promise.allSettled(def.comps.map(c=>loadSlot(c,M,c.k)));
+  const m=toModel(M,def,{via:def.main.t});
+  m.src.compFail=def.comps.filter((c,i)=>res[i].status==='rejected').map(c=>c.k);
+  return m;
+}
+const srcHost=u=>{try{return new URL(u).host}catch(e){return u}};
+async function readFile(file,def){
+  const M=new Map(),name=file.name.toLowerCase();
+  if(/\.xlsx?$/.test(name)){
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+    let done=false,err;
+    for(const sn of wb.SheetNames){try{fromTable(XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:''}),M,def);done=true;break}catch(e){err=e}}
+    if(!done)throw err;
+  }else{
+    const txt=await file.text(),s=txt.trim();
+    if(s[0]==='['||s[0]==='{')fromWB(JSON.parse(s),M,'main');
+    else{const R=parseCSV(s),h=R[0].map(x=>x.toLowerCase().trim());
+      if(h.includes('entity')&&h.includes('year'))fromOWID(R,M,'main');else fromTable(R,M,def)}
+  }
+  return toModel(M,def,{via:'file',file:file.name});
+}
+
+/* ---------- state ---------- */
+Object.keys(IDX).forEach(k=>IDX[k].id=k);
+let prefs=Object.assign({ym:'key',idx:'transparency'},store.get(PK)||{});
+const hashIdx=(location.hash.match(/idx=(\w+)/)||[])[1];if(IDX[hashIdx])prefs.idx=hashIdx;
+let CUR=IDX[prefs.idx]?prefs.idx:'transparency',DEF=IDX[CUR];
+let MODEL=null,YRS=[],YI=[],L=0,FY=0,LY=0,D=[],AVG=null,NC=0,COMPY=[],cyear=null;
+let lang='th',sel=[],selKeys=[],show=false,charts=[],LS={},status={k:'none'},busy=0,loadTok=0;
+const savePrefs=()=>store.set(PK,prefs);
+const keyOf=d=>d.ct?(d.iso3||d.n):'G:'+d.n;
+function pickYears(all){
+  const last=all.at(-1);
+  if(prefs.ym==='all'||all.length<=10)return all.slice();
+  if(prefs.ym==='five')return all.filter((y,i)=>i===0||y%5===0||y===last);
+  const s=new Set([all[0],...all.filter(y=>y%10===0),...all.slice(-5)]);
+  return all.filter(y=>s.has(y));
+}
+const better=(a,b,hb)=>hb?a>b:a<b;
+function applyModel(m){
+  MODEL=m;
+  if(!m){D=[];YRS=[];sel=[];AVG=null;NC=0;COMPY=[];return}
+  YRS=pickYears(m.years);YI=YRS.map(y=>m.years.indexOf(y));L=YRS.length-1;FY=YRS[0];LY=YRS[L];
+  const n=m.years.length,li=n-1;
+  D=m.rows.map(r=>({n:r.n,iso3:r.iso3,c:r.c,ct:r.ct,avg:!!r.avg,all:r.v.main||Array(n).fill(null),v:YI.map(i=>(r.v.main||[])[i]??null),cp:Object.fromEntries(DEF.comps.map(c=>[c.k,r.v[c.k]||Array(n).fill(null)]))}));
+  /* rank + percentile (countries only) for latest year */
+  const C=D.filter(d=>d.ct&&d.all[li]!=null);const rd=x=>+x.toFixed(DEF.dec);
+  const s=[...C].sort((a,b)=>DEF.hb?b.all[li]-a.all[li]:a.all[li]-b.all[li]);
+  s.forEach((d,i)=>{d.rk=i&&rd(s[i-1].all[li])===rd(d.all[li])?s[i-1].rk:i+1});
+  C.forEach(d=>{const w=C.filter(o=>better(rd(d.all[li]),rd(o.all[li]),DEF.hb)).length;d.pct=C.length>1?Math.round(w/(C.length-1)*100):null});
+  NC=C.length;AVG=D.find(d=>d.avg)||null;
+  COMPY=DEF.comps.length?m.years.filter((y,i)=>DEF.comps.some(c=>D.filter(d=>d.ct&&d.cp[c.k][i]!=null).length>=30)).reverse():[];
+  if(!COMPY.includes(cyear))cyear=COMPY[0]??null;
+  sel=selKeys.map(k=>D.find(d=>keyOf(d)===k)).filter(Boolean);
+}
+const compIdx=()=>MODEL?MODEL.years.indexOf(cyear):-1;
+const hasComp=()=>COMPY.length>0;
+async function update(force){
+  const id=CUR,tok=++loadTok;if(IDX[id].main.t==='file'){renderStatus();return}
+  busy++;status={k:'load'};renderStatus();
+  const prevLatest=MODEL&&MODEL.id===id?MODEL.src.latest:0;
+  try{
+    const m=await fetchIndex(id);store.set(CK(id),m);
+    if(tok!==loadTok||id!==CUR)return;
+    applyModel(m);status={k:'ok',nw:prevLatest&&m.src.latest>prevLatest?m.src.latest:0};renderAll();
+  }catch(e){if(tok!==loadTok||id!==CUR)return;status={k:MODEL?'cache':'none',err:e.message};renderStatus()}
+  finally{busy--;renderStatus()}
+}
+function switchIndex(id){
+  if(!IDX[id])return;selKeys=sel.map(keyOf).length?sel.map(keyOf):selKeys;
+  CUR=id;DEF=IDX[id];prefs.idx=id;savePrefs();history.replaceState(null,'','#idx='+id);
+  LS={};cyear=null;loadTok++;$('dd').style.display='none';$('q').blur();
+  const c=store.get(CK(id));applyModel(c&&c.years&&c.rows?c:null);
+  status={k:MODEL?'cache':'none'};renderAll();
+  if(DEF.main.t!=='file'&&(!MODEL||Date.now()-(MODEL.src.ts||0)>MAX_AGE))update(false);
+}
+
+/* ---------- i18n ---------- */
+const T={th:{title:'สำรวจดัชนีธรรมาภิบาลและโลกาภิวัตน์',sub:'เปรียบเทียบดัชนีระดับโลกของแต่ละประเทศ — ข้อมูลจริงจากฐานข้อมูลออนไลน์ อัปเดตอัตโนมัติ',
+ ph:'พิมพ์ชื่อประเทศ (ไทยหรืออังกฤษ) เช่น "ไทย" หรือ "Th"…',none:'ยังไม่ได้เลือกประเทศ — พิมพ์ในช่องค้นหาด้านบนเพื่อเริ่มต้น',noData:'ยังไม่มีข้อมูลของดัชนีนี้',
+ showCh:'📊 แสดงกราฟ',hideCh:'🙈 ซ่อนกราฟ',reset:'↺ ล้างประเทศที่เลือก',xl:'⬇ บันทึกเป็น Excel',tTitle:'ตารางข้อมูล: {name}',
+ rRank:'อันดับปี {l} (จาก {n} ประเทศ)',rPct:'เปอร์เซ็นไทล์ปี {l} (ดีกว่ากี่ % ของประเทศ)',rChg:'เปลี่ยนแปลง {f}→{l}',rAvgC:'เปลี่ยนแปลงเฉลี่ยต่อปี {f}–{l}',grp:'กลุ่ม/ภูมิภาค',nf:'ไม่พบข้อมูล',
+ secC:'ตัวชี้วัดองค์ประกอบ/ตัวชี้วัดเสริม ปี {c}',cyL:'ปีของตัวชี้วัด:',
+ cap:'คำอธิบาย: {desc} อันดับและเปอร์เซ็นไทล์คิดเฉพาะประเทศที่มีข้อมูลในปีล่าสุด ช่องสีเขียว = ค่าที่ดีที่สุดในแถว (คำนึงถึงทิศทางของแต่ละดัชนีแล้ว) "–" = ไม่มีข้อมูล "ค่าเฉลี่ยทุกประเทศ" เป็นค่าเฉลี่ยแบบไม่ถ่วงน้ำหนักที่คำนวณจากข้อมูลชุดนี้',
+ src:'แหล่งข้อมูลหลัก: {src} · ข้อมูลรายปี {a}–{z} ครอบคลุม {n} ประเทศ/ดินแดน (ตารางแสดงปี: {y})',
+ upd:'🔄 อัปเดตข้อมูลตอนนี้',imp:'📂 นำเข้าไฟล์ (CSV/XLSX/JSON)',dl:'เว็บไซต์แหล่งข้อมูลทางการ ↗',yv:'ปีที่แสดง:',yKey:'ปีหลัก + 5 ปีล่าสุด',yFive:'ทุก 5 ปี',yAll:'ทุกปี',
+ stLoad:'⏳ กำลังดึงข้อมูลล่าสุดจากฐานข้อมูลออนไลน์…',stOk:'✅ ข้อมูลล่าสุดถึงปี {z} · ที่มา: {via} · ดึงเมื่อ {u} · ตรวจสอบอัตโนมัติทุก 6 ชม.',stCache:'💾 ใช้ข้อมูลที่บันทึกไว้ (ถึงปี {z}, ดึงเมื่อ {u})',stNone:'⚠️ ยังไม่มีข้อมูลของดัชนีนี้',stErr:'เชื่อมต่อแหล่งข้อมูลไม่สำเร็จ: ',stNew:'🎉 พบข้อมูลปีใหม่! ตอนนี้มีถึงปี {z}',stComp:'ดึงตัวชี้วัดเสริมบางรายการไม่สำเร็จ: ',stFile:'📂 ข้อมูลจากไฟล์ที่นำเข้า "{file}" (ถึงปี {z}, นำเข้าเมื่อ {u})',
+ needFile:'ดัชนีนี้ต้องนำเข้าไฟล์ข้อมูลเอง — ดาวน์โหลดไฟล์จากเว็บไซต์ทางการ (ลิงก์ด้านบน) แล้วกด "นำเข้าไฟล์"',badFile:'อ่านไฟล์ไม่ได้: ต้องมีคอลัมน์ year และ code/iso3 หรือ country',noMain:'ไม่พบข้อมูลของดัชนีนี้ในแหล่งข้อมูล',
+ viaOwid:'Our World in Data',viaWb:'World Bank API',viaFile:'ไฟล์ที่นำเข้า',hb:'▲ ค่าสูง = ดี',lb:'▼ ค่าต่ำ = ดี',scale:'ช่วงค่า',
+ png:'⬇ PNG',lab:'ตัวเลข:',off:'ไม่แสดง',all:'แสดงทั้งหมด',latest:'เฉพาะปีล่าสุด',nth:'ทุกๆ N จุด',
+ c1:['แนวโน้มตามเวลา','{name} {f}–{l}'],c2:['เปรียบเทียบรายปี','กราฟแท่งกลุ่มแยกตามปี'],c3:['ค่าปี {l} (เรียงจากดีไปแย่)','เปรียบเทียบค่าล่าสุด'],c4:['การเปลี่ยนแปลง {f}→{l}','{dirc}'],
+ c5:['การเปลี่ยนแปลงเฉลี่ยต่อปี','แยกตามช่วงเวลา (หน่วยของดัชนีต่อปี)'],c6:['เรดาร์ตามปี','รูปร่างการเปลี่ยนแปลงในแต่ละปี'],c7:['ปี {f} เทียบ {l}','{dir7}'],c8:['ส่วนต่างจากค่าเฉลี่ยทุกประเทศ','ค่าบวก = สูงกว่าค่าเฉลี่ย'],
+ c9:['โปรไฟล์เปอร์เซ็นไทล์ ปี {c}','ดัชนีหลักและตัวชี้วัดเสริมเทียบกับทุกประเทศ (100 = ดีที่สุด)'],c10:['แนวโน้มตัวชี้วัดเสริม','เลือกตัวชี้วัดได้จากเมนูด้านล่าง'],c11:['เปรียบเทียบตัวชี้วัดเสริม ปี {c}','เลือกตัวชี้วัดได้จากเมนูด้านล่าง'],
+ noComp:'ยังไม่มีข้อมูลตัวชี้วัดเสริมสำหรับดัชนีนี้',dirUp:'ค่าบวก = ดีขึ้น',dirDn:'ค่าลบ = ดีขึ้น (คอร์รัปชันลดลง)',d7Up:'จุดเหนือเส้นประ = ดีขึ้นจากปี {f}',d7Dn:'จุดใต้เส้นประ = ดีขึ้น (ค่าลดลง) จากปี {f}',main:'ดัชนีหลัก',pctl:'เปอร์เซ็นไทล์'},
+en:{title:'Governance & Globalization Index Explorer',sub:'Compare global indices by country — live data from online databases, updated automatically',
+ ph:'Type a country name (English or Thai), e.g. "Th" or "ไทย"…',none:'No country selected — type in the search box above to begin',noData:'No data for this index yet',
+ showCh:'📊 Show charts',hideCh:'🙈 Hide charts',reset:'↺ Clear selection',xl:'⬇ Save as Excel',tTitle:'Data table: {name}',
+ rRank:'Rank {l} (of {n} countries)',rPct:'Percentile {l} (better than % of countries)',rChg:'Change {f}→{l}',rAvgC:'Avg. change per year {f}–{l}',grp:'Group/region',nf:'No match',
+ secC:'Component / related indicators, {c}',cyL:'Indicator year:',
+ cap:'Notes: {desc} Rank and percentile include only countries with data in the latest year. Green cell = best value in the row (direction-aware). "–" = no data. "All-country average" is an unweighted mean computed from this dataset.',
+ src:'Main source: {src} · Annual data {a}–{z} covering {n} countries/territories (table shows: {y})',
+ upd:'🔄 Update data now',imp:'📂 Import file (CSV/XLSX/JSON)',dl:'Official data source ↗',yv:'Years shown:',yKey:'Decades + last 5',yFive:'Every 5 years',yAll:'Every year',
+ stLoad:'⏳ Fetching the latest data from the online database…',stOk:'✅ Data up to {z} · via {via} · fetched {u} · auto-checks every 6 h',stCache:'💾 Using saved data (up to {z}, fetched {u})',stNone:'⚠️ No data for this index yet',stErr:'Could not reach the data source: ',stNew:'🎉 New year of data found! Now up to {z}',stComp:'Some related indicators could not be fetched: ',stFile:'📂 Data from imported file "{file}" (up to {z}, imported {u})',
+ needFile:'This index needs a data file — download it from the official website (link above) and press "Import file"',badFile:'Cannot read file: needs a year column and code/iso3 or country',noMain:'No data for this index in the source',
+ viaOwid:'Our World in Data',viaWb:'World Bank API',viaFile:'imported file',hb:'▲ higher = better',lb:'▼ lower = better',scale:'Range',
+ png:'⬇ PNG',lab:'Labels:',off:'Hidden',all:'Show all',latest:'Latest year only',nth:'Every Nth point',
+ c1:['Trend over time','{name} {f}–{l}'],c2:['By year','Grouped bars by year'],c3:['{l} values (best to worst)','Latest comparison'],c4:['Change {f}→{l}','{dirc}'],
+ c5:['Average change per year','By period (index units per year)'],c6:['Radar by year','Shape of change across years'],c7:['{f} vs {l}','{dir7}'],c8:['Gap vs all-country average','Positive = above average'],
+ c9:['Percentile profile, {c}','Main index and related indicators vs all countries (100 = best)'],c10:['Related indicator trend','Pick an indicator from the menu below'],c11:['Related indicator comparison, {c}','Pick an indicator from the menu below'],
+ noComp:'No related-indicator data for this index yet',dirUp:'Positive = improved',dirDn:'Negative = improved (less corruption)',d7Up:'Above the dashed line = improved since {f}',d7Dn:'Below the dashed line = improved (lower) since {f}',main:'Main index',pctl:'Percentile'}};
+const nmIdx=(id=CUR,l=lang)=>IDX[id][l];
+const fmtDate=ts=>ts?new Date(ts).toLocaleString(lang==='th'?'th-TH':'en-GB',{dateStyle:'medium',timeStyle:'short'}):'–';
+const viaName=()=>!MODEL?'':MODEL.src.via==='owid'?T[lang].viaOwid:MODEL.src.via==='wb'?T[lang].viaWb:T[lang].viaFile;
+const sub=s=>s.replace(/\{f\}/g,FY).replace(/\{l\}/g,LY).replace(/\{n\}/g,NC).replace(/\{y\}/g,YRS.join(', ')).replace(/\{a\}/g,MODEL?MODEL.years[0]:'').replace(/\{z\}/g,MODEL?MODEL.years.at(-1):'')
+  .replace(/\{c\}/g,cyear??'–').replace(/\{u\}/g,MODEL?fmtDate(MODEL.src.ts):'–').replace(/\{via\}/g,viaName()).replace(/\{file\}/g,MODEL&&MODEL.src.file||'')
+  .replace(/\{name\}/g,nmIdx()).replace(/\{desc\}/g,DEF.desc[lang]).replace(/\{src\}/g,lang==='th'?DEF.src.n:DEF.src.ne)
+  .replace(/\{dirc\}/g,T[lang][DEF.hb?'dirUp':'dirDn']).replace(/\{dir7\}/g,T[lang][DEF.hb?'d7Up':'d7Dn'].replace(/\{f\}/g,FY));
+const t=k=>{const v=T[lang][k];return Array.isArray(v)?v.map(sub):sub(v)};
+const dnTH=new Intl.DisplayNames(['th'],{type:'region'});
+const nm=(d,l=lang)=>{if(d.n==='__AVG')return l==='en'?'All-country average (computed)':TH_G.__AVG;
+  if(l==='en')return d.n;if(d.c){try{return dnTH.of(d.c)}catch(e){}}return TH_G[d.n]||d.n};
+const $=id=>document.getElementById(id);
+const col=(i,a=1)=>`hsla(${(i*137.5+215)%360},68%,46%,${a})`;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+const fx=(v,dec)=>v==null?'–':v.toFixed(dec);
+const cName=c=>c==='main'?nmIdx():(DEF.comps.find(x=>x.k===c)||{})[lang]||c;
+
+/* ---------- picker + about + data panel ---------- */
+function renderPicker(){
+  $('picker').innerHTML=ORDER.map(id=>{const d=IDX[id];return `<button class="ix ${id===CUR?'on':''}" data-id="${id}" style="--c:${d.col}"><span class="ic">${d.ic}</span><b>${esc(d[lang])}</b><small>${esc((lang==='th'?d.src.n:d.src.ne).replace(/\s*\(.*\)/,''))}</small></button>`}).join('');
+  $('picker').querySelectorAll('.ix').forEach(b=>b.onclick=()=>switchIndex(b.dataset.id));
+  const a=$('about');a.style.setProperty('--c',DEF.col);
+  a.innerHTML=`<h2>${DEF.ic} ${esc(DEF.full[lang])}<span class="dir ${DEF.hb?'up':'down'}">${esc(t(DEF.hb?'hb':'lb'))}</span></h2><p>${esc(DEF.desc[lang])}</p><p>${esc(t('scale'))}: ${DEF.min}–${DEF.max} · <a href="${DEF.src.url}" target="_blank" rel="noopener">${esc(lang==='th'?DEF.src.n:DEF.src.ne)} ↗</a></p>`;
+}
+function renderStatus(){
+  const k=status.k,el=$('dstat');
+  const base=k==='load'?t('stLoad'):k==='ok'?t('stOk'):k==='cache'?(MODEL&&MODEL.src.via==='file'?t('stFile'):t('stCache')):t('stNone');
+  el.className='dstat '+(k==='ok'||(k==='cache'&&!status.err)?'good':k==='load'?'':'warn');
+  let h=esc(base);
+  if(DEF.main.t==='file'&&!MODEL)h+=' <small>'+esc(t('needFile'))+'</small>';
+  if(status.err)h+=' <small>'+esc(t('stErr'))+esc(status.err)+'</small>';
+  if((k==='ok'||k==='cache')&&MODEL&&MODEL.src.compFail&&MODEL.src.compFail.length)h+=' <small>'+esc(t('stComp'))+esc(MODEL.src.compFail.map(cName).join(', '))+'</small>';
+  if(status.nw)h+='<div class="new">'+esc(t('stNew'))+'</div>';
+  el.innerHTML=h;$('bup').disabled=busy>0||DEF.main.t==='file';
+}
+function dataPanel(){
+  $('dym').innerHTML=[['key','yKey'],['five','yFive'],['all','yAll']].map(([v,k])=>`<option value="${v}" ${prefs.ym===v?'selected':''}>${t(k)}</option>`).join('');
+  $('dl').textContent=t('dl');$('dl').href=DEF.src.url;
+  $('q').disabled=!MODEL;renderStatus();
+}
+$('dym').onchange=e=>{prefs.ym=e.target.value;savePrefs();if(MODEL)applyModel(MODEL);renderAll()};
+$('bup').onclick=()=>update(true);
+$('bimp').onclick=()=>$('dfile').click();
+$('dfile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{const m=await readFile(f,DEF);store.set(CK(CUR),m);applyModel(m);status={k:'cache'};renderAll()}
+  catch(err){status={k:MODEL?'cache':'none',err:err.message};renderStatus()}};
+
+/* ---------- search ---------- */
+let hl=0,matches=[];
+function search(){
+  const q=$('q').value.trim().toLowerCase();
+  const sc=d=>{const a=[nm(d,'th').toLowerCase(),nm(d,'en').toLowerCase(),(d.c||'').toLowerCase(),(d.iso3||'').toLowerCase()];
+    if(!q)return 1;if(a.some(s=>s.startsWith(q)))return 0;if(a.some(s=>s.split(/[\s(),-]+/).some(w=>w.startsWith(q))))return 1;if(a.some(s=>s.includes(q)))return 2;return 9};
+  matches=D.map(d=>[sc(d)+(d.ct?0:.5),d]).filter(x=>x[0]<9||!q).sort((a,b)=>a[0]-b[0]||nm(a[1]).localeCompare(nm(b[1]),lang)).map(x=>x[1]);
+  hl=0;drawDD();
+}
+function drawDD(){
+  const dd=$('dd');dd.style.display='block';dd.innerHTML=matches.length?'':`<div>${t('nf')}</div>`;
+  matches.forEach((d,i)=>{const e=document.createElement('div');e.className=(sel.includes(d)?'on ':'')+(i===hl?'hl':'');
+    e.innerHTML=`<span>${sel.includes(d)?'✓ ':''}${esc(nm(d))}</span><small>${esc(lang==='th'?nm(d,'en'):nm(d,'th'))}${d.ct?'':' · '+t('grp')}</small>`;
+    e.onmousedown=ev=>{ev.preventDefault();toggle(d)};dd.appendChild(e)});
+}
+function toggle(d){sel=sel.includes(d)?sel.filter(x=>x!==d):[...sel,d];selKeys=sel.map(keyOf);refresh();drawDD()}
+$('q').addEventListener('input',search);$('q').addEventListener('focus',search);
+$('q').addEventListener('blur',()=>$('dd').style.display='none');
+$('q').addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'){hl=Math.min(hl+1,matches.length-1);drawDD();$('dd').children[hl]?.scrollIntoView({block:'nearest'})}
+  else if(e.key==='ArrowUp'){hl=Math.max(hl-1,0);drawDD();$('dd').children[hl]?.scrollIntoView({block:'nearest'})}
+  else if(e.key==='Enter'&&matches[hl])toggle(matches[hl]);else if(e.key==='Escape')$('dd').style.display='none'});
+
+/* ---------- table ---------- */
+function pctOf(d,arrKey,i,hb){ /* percentile of entity d for slot at year index i */
+  const get=x=>arrKey==='main'?x.all[i]:x.cp[arrKey][i];const v=get(d);if(v==null)return null;
+  const C=D.filter(x=>x.ct&&get(x)!=null);if(C.length<2)return null;
+  return Math.round(C.filter(x=>better(v,get(x),hb)).length/(C.length-1)*100);
+}
+function rows(){
+  const dec=DEF.dec,R=[];
+  R.push({l:t('rRank'),v:sel.map(d=>d.ct?d.rk??null:null),f:v=>v});
+  R.push({l:t('rPct'),v:sel.map(d=>d.ct?d.pct??null:null),f:v=>v,b:1,hb:true});
+  YRS.forEach((y,i)=>R.push({l:nmIdx()+' '+y,v:sel.map(d=>d.v[i]),f:v=>v.toFixed(dec),b:1,hb:DEF.hb}));
+  R.push({l:t('rChg'),v:sel.map(d=>d.v[0]!=null&&d.v[L]!=null?+(d.v[L]-d.v[0]).toFixed(dec+1):null),f:v=>(v>0?'+':'')+v.toFixed(dec+1),b:1,hb:DEF.hb});
+  R.push({l:t('rAvgC'),v:sel.map(d=>d.v[0]!=null&&d.v[L]!=null&&LY>FY?+((d.v[L]-d.v[0])/(LY-FY)).toFixed(dec+2):null),f:v=>(v>0?'+':'')+v.toFixed(dec+2),b:1,hb:DEF.hb});
+  if(hasComp()){const ci=compIdx();R.push({sec:t('secC')});
+    DEF.comps.forEach(c=>R.push({l:c[lang]+(c.hb?' ▲':' ▼'),v:sel.map(d=>d.cp[c.k][ci]),f:v=>v.toFixed(c.dec),b:1,hb:c.hb}));}
+  return R;
+}
+function renderTable(){
+  $('tTitle').textContent=t('tTitle');
+  $('cyl').style.display=hasComp()&&sel.length?'':'none';
+  if(hasComp())$('cyr').innerHTML=COMPY.map(y=>`<option ${y===cyear?'selected':''}>${y}</option>`).join('');
+  if(!MODEL){$('tbl').innerHTML=`<div class="empty">${esc(t('noData'))}<br><small>${DEF.main.t==='file'?esc(t('needFile')):''}</small></div>`;$('cap').textContent='';$('bxl').disabled=true;return}
+  if(!sel.length){$('tbl').innerHTML=`<div class="empty">${t('none')}</div>`;$('cap').textContent='';$('bxl').disabled=true;return}
+  $('bxl').disabled=false;
+  let h='<table><thead><tr><th></th>'+sel.map(d=>`<th>${esc(nm(d))}</th>`).join('')+'</tr></thead><tbody>';
+  rows().forEach(r=>{
+    if(r.sec){h+=`<tr class="sec"><td colspan="${sel.length+1}">${esc(r.sec)}</td></tr>`;return}
+    const nums=r.v.filter(v=>typeof v==='number');
+    const bst=r.b&&sel.length>1&&nums.length?(r.hb?Math.max(...nums):Math.min(...nums)):null;
+    h+=`<tr><td>${esc(r.l)}</td>`+r.v.map(v=>`<td class="${bst!=null&&v===bst?'best':''}">${v==null?'–':esc(r.f(v))}</td>`).join('')+'</tr>';
+  });
+  $('tbl').innerHTML=h+'</tbody></table>';$('cap').textContent=t('cap');
+}
+$('cyr').onchange=e=>{cyear=+e.target.value;refresh()};
+$('bxl').onclick=()=>{
+  const R=rows();
+  const ws=XLSX.utils.aoa_to_sheet([[t('tTitle')],[DEF.full[lang]],[],['',...sel.map(d=>nm(d))],...R.map(r=>r.sec?[r.sec]:[r.l,...r.v])]);
+  ws['!cols']=[{wch:44},...sel.map(()=>({wch:20}))];
+  const head=[lang==='th'?'ประเทศ/กลุ่ม':'Country/group','ISO3',lang==='th'?'ปี':'Year',nmIdx(),...DEF.comps.map(c=>c[lang])];
+  const full=XLSX.utils.aoa_to_sheet([head,...sel.flatMap(d=>MODEL.years.map((y,i)=>[nm(d),d.iso3||'',y,d.all[i],...DEF.comps.map(c=>d.cp[c.k][i])]))]);
+  full['!cols']=[{wch:28},{wch:6},{wch:6},{wch:18},...DEF.comps.map(()=>({wch:22}))];
+  const note=XLSX.utils.aoa_to_sheet([[DEF.full[lang]],[DEF.desc[lang]],[t('cap')],[t('src')],[DEF.src.url]]);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Table');XLSX.utils.book_append_sheet(wb,full,'All years');XLSX.utils.book_append_sheet(wb,note,'Notes');
+  XLSX.writeFile(wb,`${CUR}_comparison_${FY}-${LY}.xlsx`);
+};
+
+/* ---------- charts ---------- */
+const BG={id:'bg',beforeDraw(c){const x=c.ctx;x.save();x.globalCompositeOperation='destination-over';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.restore()}};
+const VL={id:'vl',afterDatasetsDraw(ch){
+  const o=ch.options.plugins.vl||{};if(!o.mode||o.mode==='off')return;
+  const x=ch.ctx;x.save();x.font='600 11px Sarabun,sans-serif';x.fillStyle='#1c2333';
+  const hz=ch.options.indexAxis==='y';
+  ch.data.datasets.forEach((ds,di)=>{
+    const m=ch.getDatasetMeta(di);if(m.hidden||ds.nolabel)return;
+    let last=-1;ds.data.forEach((v,i)=>{if(v!=null)last=i});
+    m.data.forEach((el,i)=>{const v=ds.data[i];if(v==null)return;
+      if(o.mode==='latest'&&i!==last)return;if(o.mode==='nth'&&i%Math.max(1,o.n)!==0)return;
+      const txt=o.f?o.f(v,ds,i):(typeof v==='number'?v.toFixed(DEF.dec):v);
+      if(hz){x.textAlign='left';x.textBaseline='middle';x.fillText(txt,el.x+4,el.y)}
+      else{x.textAlign='center';x.textBaseline='bottom';x.fillText(txt,el.x,el.y-5)}})});
+  x.restore()}};
+if(window.Chart){Chart.register(VL,BG);Chart.defaults.font.family='Sarabun,sans-serif'}
+function card(id,key,modes,defN,cfg,f,x){
+  const s=LS[id]||(LS[id]={mode:'off',n:defN});
+  cfg.options=Object.assign({responsive:true,maintainAspectRatio:false,layout:{padding:{top:16,right:24}}},cfg.options||{});
+  cfg.options.plugins=Object.assign({legend:{position:'bottom'},vl:{mode:s.mode,n:s.n,f}},cfg.options.plugins||{});
+  const e=document.createElement('div');e.className='card ch';
+  const lbl={off:t('off'),all:t('all'),latest:t('latest'),nth:t('nth')};
+  e.innerHTML=`<h3>${esc(t(key)[0])}</h3><p>${esc(t(key)[1])}</p><div class="ctl">${x?`<select class="xs">${x.o.map(([v,l])=>`<option value="${v}" ${v===x.v?'selected':''}>${esc(l)}</option>`).join('')}</select>`:''}<button class="btn sec png">${t('png')}</button><span>${t('lab')}</span><select class="ls">${modes.map(m=>`<option value="${m}" ${m===s.mode?'selected':''}>${lbl[m]}</option>`).join('')}</select><input type="number" min="1" value="${s.n}" title="N"></div><div class="cv"><canvas></canvas></div>`;
+  $('grid').appendChild(e);
+  const ch=new Chart(e.querySelector('canvas'),cfg);charts.push(ch);
+  const sl=e.querySelector('.ls'),inp=e.querySelector('input');
+  if(x)e.querySelector('.xs').onchange=ev=>x.on(ev.target.value);
+  const up=()=>{s.mode=sl.value;s.n=+inp.value||1;inp.style.display=s.mode==='nth'?'':'none';ch.options.plugins.vl.mode=s.mode;ch.options.plugins.vl.n=s.n;ch.update()};
+  sl.onchange=up;inp.oninput=up;inp.style.display=s.mode==='nth'?'':'none';
+  e.querySelector('.png').onclick=()=>{const a=document.createElement('a');a.href=ch.toBase64Image('image/png',1);a.download=`${CUR}_${id}.png`;a.click()};
+}
+function note(h,p){const e=document.createElement('div');e.className='card ch';e.innerHTML=`<h3>${esc(h)}</h3><p>${esc(p)}</p>`;$('grid').appendChild(e)}
+function renderCharts(){
+  charts.forEach(c=>c.destroy());charts=[];$('grid').innerHTML='';
+  $('charts').style.display=show&&sel.length&&MODEL?'block':'none';
+  if(!show||!sel.length||!MODEL||!window.Chart)return;
+  const N=sel.map(d=>nm(d)),T_=['off','all','latest','nth'],B=['off','all','nth'],dec=DEF.dec,mm={min:DEF.min,max:DEF.max};
+  const ds=(fn,extra={})=>sel.map((d,i)=>Object.assign({label:N[i],data:fn(d),borderColor:col(i),backgroundColor:col(i,.75)},extra));
+  const line={tension:.25,spanGaps:true,pointRadius:YRS.length>15?2:4,borderWidth:2.5,backgroundColor:undefined};
+  const sgn=d=>v=>(v>0?'+':'')+v.toFixed(d);
+  const hz=sel.length>6,vAx=hz?'x':'y';
+  card('trend','c1',T_,2,{type:'line',data:{labels:YRS,datasets:ds(d=>d.v,line)},options:{scales:{y:{title:{display:true,text:nmIdx()}}}}});
+  card('byyear','c2',T_,2,{type:'bar',data:{labels:YRS,datasets:ds(d=>d.v)},options:{scales:{y:{...mm}}}});
+  const sorted=sel.map((d,i)=>({i,v:d.v[L]})).sort((a,b)=>(a.v==null)-(b.v==null)||(DEF.hb?b.v-a.v:a.v-b.v));
+  card('latest','c3',B,10,{type:'bar',data:{labels:sorted.map(x=>N[x.i]),datasets:[{label:nmIdx()+' '+LY,data:sorted.map(x=>x.v),backgroundColor:sorted.map(x=>col(x.i,.8))}]},options:{indexAxis:hz?'y':'x',scales:{[vAx]:{...mm}},plugins:{legend:{display:false}}}});
+  const chg=sel.map((d,i)=>({i,v:d.v[0]!=null&&d.v[L]!=null?+(d.v[L]-d.v[0]).toFixed(dec+1):null})).sort((a,b)=>(a.v==null)-(b.v==null)||(DEF.hb?b.v-a.v:a.v-b.v));
+  card('change','c4',B,10,{type:'bar',data:{labels:chg.map(x=>N[x.i]),datasets:[{label:t('rChg'),data:chg.map(x=>x.v),backgroundColor:chg.map(x=>x.v!=null&&(x.v>0)===DEF.hb?'#16a34acc':'#dc2626cc')}]},options:{indexAxis:hz?'y':'x',plugins:{legend:{display:false}}}},sgn(dec+1));
+  const ms=[...new Set([FY,...YRS.filter(y=>y%10===0),LY])].sort((a,b)=>a-b);const P=[];
+  for(let i=0;i<ms.length-1;i++)P.push([YRS.indexOf(ms[i]),YRS.indexOf(ms[i+1]),ms[i+1]-ms[i],ms[i]+'–'+ms[i+1]]);
+  if(ms.length>2)P.push([0,L,LY-FY,FY+'–'+LY]);
+  if(P.length)card('growth','c5',T_,2,{type:'bar',data:{labels:P.map(x=>x[3]),datasets:ds(d=>P.map(([a,b,y])=>d.v[a]!=null&&d.v[b]!=null&&y>0?+((d.v[b]-d.v[a])/y).toFixed(dec+2):null))}},sgn(dec+2));
+  if(YRS.length>=3)card('radar','c6',T_,2,{type:'radar',data:{labels:YRS,datasets:ds(d=>d.v,{backgroundColor:undefined,fill:false,pointRadius:3})},options:{scales:{r:{...mm}}}});
+  const sc=ds(d=>[{x:d.v[0],y:d.v[L]}],{pointRadius:7,pointHoverRadius:9,showLine:false});sc.forEach(s=>s.backgroundColor=s.borderColor);
+  card('scatter','c7',B,1,{type:'scatter',data:{datasets:[...sc,{label:'y = x',type:'line',data:[{x:DEF.min,y:DEF.min},{x:DEF.max,y:DEF.max}],borderDash:[6,5],borderColor:'#999',pointRadius:0,nolabel:true}]},options:{scales:{x:{...mm,title:{display:true,text:nmIdx()+' '+FY}},y:{...mm,title:{display:true,text:nmIdx()+' '+LY}}}}},(v,d)=>d.label);
+  card('gap','c8',T_,2,{type:'line',data:{labels:YRS,datasets:ds(d=>d.v.map((x,i)=>x!=null&&AVG&&AVG.v[i]!=null?+(x-AVG.v[i]).toFixed(dec+1):null),line)}},sgn(dec+1));
+  /* ----- related / component indicators ----- */
+  if(!hasComp()){note(t('c9')[0],t('noComp'));return}
+  const ci=compIdx(),li=MODEL.years.indexOf(cyear);
+  const axes=[['main',DEF.hb],...DEF.comps.map(c=>[c.k,c.hb])];
+  card('pct','c9',B,1,{type:'radar',data:{labels:axes.map(([k])=>cName(k).replace(/\s*\(.*\)$/,'')),datasets:ds(d=>axes.map(([k,hb])=>pctOf(d,k,li,hb)),{backgroundColor:undefined,fill:false,pointRadius:4,borderWidth:2.5})},options:{scales:{r:{min:0,max:100,ticks:{stepSize:20}}}}},v=>v.toFixed(0));
+  const IO=DEF.comps.map(c=>[c.k,c[lang]]);
+  const k1=LS.k1&&DEF.comps.some(c=>c.k===LS.k1)?LS.k1:DEF.comps[0].k,c1=DEF.comps.find(c=>c.k===k1);
+  card('ctrend','c10',T_,2,{type:'line',data:{labels:YRS,datasets:ds(d=>YI.map(i=>d.cp[k1][i]),line)},options:{scales:{y:{title:{display:true,text:c1[lang]}}}}},v=>v.toFixed(c1.dec),{o:IO,v:k1,on:v=>{LS.k1=v;renderCharts()}});
+  const k2=LS.k2&&DEF.comps.some(c=>c.k===LS.k2)?LS.k2:DEF.comps[0].k,c2=DEF.comps.find(c=>c.k===k2);
+  const sv=sel.map((d,i)=>({i,v:d.cp[k2][ci]})).sort((a,b)=>(a.v==null)-(b.v==null)||(c2.hb?b.v-a.v:a.v-b.v));
+  card('cbar','c11',B,1,{type:'bar',data:{labels:sv.map(z=>N[z.i]),datasets:[{label:c2[lang],data:sv.map(z=>z.v),backgroundColor:sv.map(z=>col(z.i,.8))}]},options:{indexAxis:hz?'y':'x',plugins:{legend:{display:false}},scales:{[vAx]:{min:c2.min,max:c2.max,title:{display:true,text:c2[lang]}}}}},v=>v.toFixed(c2.dec),{o:IO,v:k2,on:v=>{LS.k2=v;renderCharts()}});
+}
+
+/* ---------- chrome ---------- */
+function chips(){$('chips').innerHTML='';sel.forEach(d=>{const e=document.createElement('span');e.className='chip';e.innerHTML=`${esc(nm(d))}<b title="✕">✕</b>`;e.querySelector('b').onclick=()=>toggle(d);$('chips').appendChild(e)})}
+function refresh(){chips();renderTable();renderCharts();$('srcnote').textContent=MODEL?t('src'):''}
+function renderAll(){
+  document.documentElement.lang=lang;
+  document.querySelectorAll('[data-i]').forEach(e=>e.textContent=t(e.dataset.i));
+  $('bch').textContent=t(show?'hideCh':'showCh');$('q').placeholder=t('ph');
+  $('bth').classList.toggle('on',lang==='th');$('ben').classList.toggle('on',lang==='en');
+  renderPicker();dataPanel();refresh();
+}
+$('bth').onclick=()=>{lang='th';renderAll()};$('ben').onclick=()=>{lang='en';renderAll()};
+$('bch').onclick=()=>{show=!show;$('bch').textContent=t(show?'hideCh':'showCh');renderCharts();if(show&&sel.length)$('charts').scrollIntoView({behavior:'smooth'})};
+$('brs').onclick=()=>{sel=[];selKeys=[];LS={};$('q').value='';$('dd').style.display='none';refresh()};
+window.addEventListener('hashchange',()=>{const h=(location.hash.match(/idx=(\w+)/)||[])[1];if(IDX[h]&&h!==CUR)switchIndex(h)});
+
+/* ---------- start ---------- */
+selKeys=['THA'];
+switchIndex(CUR);
+setInterval(()=>{if(!document.hidden)update(false)},POLL);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&MODEL&&Date.now()-(MODEL.src.ts||0)>POLL)update(false)});
+</script>
+</body>
+</html>
